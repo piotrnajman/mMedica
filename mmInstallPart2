@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+#
+# Instalacja ze zrodel servera PostgreSQL 9.5.XX (tu 15)
+# Autor Piotr Najman (c) 2021 GPLv3
+# pnajman@vespe.pl
+#
+
+set -e
+cd ~/
+
+#### instalacja pakietów
+apt-get -y install vim-scripts make build-essential
+apt-get -y install libreadline-dev libzzip-dev zlib1g-dev
+apt-get -y install bison flex
+apt-get -y install zip unzip
+
+#### kompilacja postgresa ze zrodla
+wget -c https://ftp.postgresql.org/pub/source/v9.5.15/postgresql-9.5.15.tar.bz2
+bunzip2 ./postgresql-9.5.15.tar.bz2
+tar xf ./postgresql-9.5.15.tar
+cd ~/postgresql-9.5.15
+./configure
+make
+make world
+#make check (uruchamiamy jako user)
+make install
+make install-docs
+make install-world
+
+echo "Dodawanie użytkownika postgres"
+#adduser postgres
+useradd postgres
+
+mkdir /usr/local/pgsql/data
+mkdir /usr/local/pgsql/log
+chown postgres:postgres /usr/local/pgsql/data
+chown postgres:postgres /usr/local/pgsql/log
+
+
+#### podmiana plików
+mkdir ~/PostgreSQL-9.5-Linux
+cd ~/PostgreSQL-9.5-Linux
+wget -c http://mmedica-download.asseco.pl/inst/inne/PostgreSQL-9.5-Linux.zip
+unzip ./PostgreSQL-9.5-Linux.zip
+rm ./PostgreSQL-9.5-Linux.zip
+
+cp initdb /usr/local/pgsql/bin/initdb
+cp libpqwalreceiver.so /usr/local/pgsql/lib/libpqwalreceiver.so
+cp pg_ctl /usr/local/pgsql/bin/pg_ctl
+cp pg_dump /usr/local/pgsql/bin/pg_dump
+cp pg_restore /usr/local/pgsql/bin/pg_restore
+cp postgres /usr/local/pgsql/bin/postgres
+cp postgres.bki /usr/local/pgsql/share/postgres.bki
+cp libpq.so.5.8 /usr/local/pgsql/lib/libpq.so.5.8
+
+su - postgres -c "/usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data/"
+su - postgres -c "/usr/local/pgsql/bin/pg_ctl start -D /usr/local/pgsql/data/ -l /usr/local/pgsql/log/postgresql.log"
+
+
+#### modyfikacje dla polaczen zdalnych i restart uslugi - UWAGA ustawić podsieć w zmianie pg_hba jaka potrzebna i adres ip hosta w poleceniu sed !!!!
+echo "host	all		all 	192.168.0.0/16		md5" >> /usr/local/pgsql/data/pg_hba.conf
+
+sed -i 's/'#listen_addresses\ =\ \'localhost\''/'listen_addresses\ =\ \'localhost,192.168.1.18\''/' /usr/local/pgsql/data/postgresql.conf
+sed -i 's/'#search_path\ =\ \'\"\$user\",\ public\''/'search_path\ =\ \'public,restricted\''/' /usr/local/pgsql/data/postgresql.conf
+
+su - postgres -c "/usr/local/pgsql/bin/pg_ctl restart -D /usr/local/pgsql/data/ -l /usr/local/pgsql/log/postgresql.log"
+
+su - postgres -c "/usr/local/pgsql/bin/pg_ctl stop -D /usr/local/pgsql/data/ -l /usr/local/pgsql/log/postgresql.log"
+
+#### utworzenie serwisu
+cat << EOF > /lib/systemd/system/postgresql.service
+[Unit]
+Description=Postgresql-9.5 Service
+After=syslog.target systemd-user-sessions.service
+
+[Service]
+User=postgres
+Group=postgres
+Type=forking
+TimeoutSec=120
+ExecStart=/usr/local/pgsql/bin/pg_ctl start -D /usr/local/pgsql/data -l /usr/local/pgsql/log/postgresql.log
+ExecStop=/usr/local/pgsql/bin/pg_ctl stop -D /usr/local/pgsql/data -l /usr/local/pgsql/log/postgresql.log
+ExecReload=/usr/local/pgsql/bin/pg_ctl reload -D /usr/local/pgsql/data -l /usr/local/pgsql/log/postgresql.log
+Restart=/usr/local/pgsql/bin/pg_ctl restart -D /usr/local/pgsql/data -l /usr/local/pgsql/log/postgresql.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+
+
+#### start postgresa jako serwisu
+
+systemctl enable postgresql.service
+
+systemctl start postgresql.service
+
+#### sprzatanie po instalacji
+
+rm -rf ~/PostgreSQL-9.5-Linux*
+rm -rf ~/postgresql-9.5.15.tar
+

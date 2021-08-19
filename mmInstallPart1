@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+#
+# Wstepna konfiguracja systemu, instalacja/konfiguracja CP1250
+# Autor Piotr Najman (c) 2021 GPLv3
+# pnajman@vespe.pl
+#
+
+set -e
+
+#### debian net install dodatkowe pakiety - to niekonieczne
+apt-get update
+apt-get -y install vim mc open-vm-tools net-tools dialog nmon tcpdump iptraf
+
+#### zmiana locales na CP1250 - UWAGA w oknie dpkg wybieramy cp1250 jako defaultowa !!!!
+echo "pl_PL.CP1250 CP1250" >> /etc/locale.gen
+locale-gen
+dpkg-reconfigure locales
+reboot

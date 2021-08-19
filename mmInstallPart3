@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+#
+# Instalajca i wstepna konfiguracja Apache2, MS .NET
+# Autor Piotr Najman (c) 2021 GPLv3
+# pnajman@vespe.pl
+#
+
+set -e
+cd ~/
+
+#### instalacja apache2
+
+apt-get update
+apt-get -y install apache2 libcurl4-openssl-dev libunwind8 default-jre
+
+#### instalacja mono/.net odkomentowac lub dodac odpowiednie repo
+#wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+#wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+dpkg -i packages-microsoft-prod.deb
+#sed -i 's/,arm64,armhf//' /etc/apt/sources.list.d/microsoft-prod.list
+apt-get update
+apt-get -y install apt-transport-https
+apt-get update
+apt-get -y install aspnetcore-runtime-3.1
+
+#### konfiguracja apache
+
+a2enmod ssl
+a2enmod proxy
+a2enmod proxy_balancer
+a2enmod proxy_http
+a2enmod headers
+
+a2dismod -f autoindex
+
+a2dissite 000-default
+a2dissite default-ssl
+
+#### add mimes
+echo "application/x-font-woff				woff" >> /etc/mime.types
+echo "application/x-font-woff2				woff2" >> /etc/mime.types
+
+systemctl restart apache2
+
+#### sprzatanie
+rm ~/packages-microsoft-prod.deb
+
