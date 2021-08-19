@@ -6,7 +6,9 @@ mmInstallPart2 - instalacja postgresa
 
 mmInstallPart3 - instalacja apache2 i aspnet
 
-mmInstalleRejestracja - instalacja modul eRejestracja (skrypt umożliwia uruchomienie jednej lib kilku instancji usługii na jednym hoście)
+mmInstalleRejestracja - instalacja modułu eRejestracja (skrypt umożliwia uruchomienie jednej lib kilku instancji usługii na jednym hoście)
+
+mmInstalleArchiwum - instalacja modułu eArchiwum (jedna instancja)
 
 Testowane na : Debian 10.10; Ubuntu 18.04.5
 
