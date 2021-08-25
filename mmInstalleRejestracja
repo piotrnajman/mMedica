@@ -169,8 +169,8 @@ cat << EOF > /etc/apache2/sites-available/eRejestracja-ssl$_SUFFIX.conf
                 #   /usr/share/doc/apache2/README.Debian.gz for more info.
                 #   If both key and certificate are stored in the same file, only the
                 #   SSLCertificateFile directive is needed.
-                SSLCertificateFile      /etc/ssl/certs/6BE2C3585DBC60D372043A560D129B3C.crt
-                SSLCertificateKeyFile /etc/ssl/private/6BE2C3585DBC60D372043A560D129B3C.key
+                SSLCertificateFile      /etc/ssl/certs/$_PUBFILE
+                SSLCertificateKeyFile /etc/ssl/private/$_KEYFILE
 
                 #   Server Certificate Chain:
                 #   Point SSLCertificateChainFile at a file containing the
