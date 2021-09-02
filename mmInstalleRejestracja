@@ -124,8 +124,8 @@ a2ensite eRejestracja$_SUFFIX
 #### konfiguracja ssl apache2 jeżeli sa klucze
 if [ $_CERTS -eq 1 ]; then
 
-cp ~/6BE2C3585DBC60D372043A560D129B3C.crt /etc/ssl/certs/
-cp ~/6BE2C3585DBC60D372043A560D129B3C.key /etc/ssl/private/
+cp ~/$_PUBFILE /etc/ssl/certs/
+cp ~/$_KEYFILE /etc/ssl/private/
 
 cat << EOF > /etc/apache2/sites-available/eRejestracja-ssl$_SUFFIX.conf
 <IfModule mod_ssl.c>
