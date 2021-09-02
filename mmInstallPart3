@@ -2,7 +2,7 @@
 
 #
 # Instalajca i wstepna konfiguracja Apache2, MS .NET
-# Autor Piotr Najman (c) 2021 GPLv3
+# Autor Piotr Najman (c) 2021 MIT License
 # pnajman@vespe.pl
 #
 
@@ -17,6 +17,7 @@ apt-get -y install apache2 libcurl4-openssl-dev libunwind8 default-jre
 #### instalacja mono/.net odkomentowac lub dodac odpowiednie repo
 #wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 #wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+wget https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 dpkg -i packages-microsoft-prod.deb
 #sed -i 's/,arm64,armhf//' /etc/apt/sources.list.d/microsoft-prod.list
 apt-get update

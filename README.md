@@ -10,7 +10,7 @@ mmInstalleRejestracja - instalacja modułu eRejestracja (skrypt umożliwia uruch
 
 mmInstalleArchiwum - instalacja modułu eArchiwum (jedna instancja)
 
-Testowane na : Debian 10.10; Ubuntu 18.04.5
+Testowane na : Debian 10.10 11.0; Ubuntu 18.04.5
 
 Materiał ma charakter edukacyjny i poglądowy wskazujący sposób postępowania w celu uruchomienia potrzebnych usług. Możliwa jest instalacja na jednym hoście, dwóch (osobno baza, osobno usługi) lub po małej modyfikacji skryptów także na trzech hostach (osobno baza, osobno aplikacja(e), osobno reverse proxy) 
 
