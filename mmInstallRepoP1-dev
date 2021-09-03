@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+
+set -e
+#set -o xtrace
+
+#
+# Instalacja uslugi RepozytoriumP1
+# Autor Piotr Najman (c) 2021 MIT License
+# pnajman@vespe.pl
+#
+
+
+#### sprawdznie czy sa dostepne wymagane repozytoria, podsumowanie przed startem skryptu
+#### pobieranie niezbednych zmiennych, wyswietlenie podsumowania
+#### w katalogu ze skryptami umieszczamy repozytorium mMods_RepozytoriumP1_pkg.zip
+#### klucze dla połączenia TLS, certyfikaty wg listy zmiennych ponizej
+
+_ZIPFILE=./mMods_RepozytoriumP1_pkg.zip
+_PUBFILE=./6BE2C3585DBC60D372043A560D129B3C.crt
+_KEYFILE=./6BE2C3585DBC60D372043A560D129B3C.key
+_P1CA=./CCP1RootCA.crt
+_P1DN=./CCP1SubCATLS.crt
+_CERTS=0
+
+if [ ! -f $_ZIPFILE ]; then
+   echo "File $_ZIPFILE which is needed does not exist, exiting."
+   exit 0
+else
+   echo "Found $_ZIPFILE repository."
+fi
+
+if [ ! -f $_P1CA ]; then
+   echo "File $_P1CA which is needed does not exist, exiting."
+   exit 0
+else
+   echo "Found $_P1CA CARoot file."
+fi
+
+if [ ! -f $_P1DN ]; then
+   echo "File $_P1DN which is needed does not exist, exiting."
+   exit 0
+else
+   echo "Found $_P1DN CADNRequest file."
+fi
+
+if [ -f $_KEYFILE ] && [ -f $_PUBFILE ]; then
+   echo "Found private and public keys."
+   _CERTS=1
+else
+   echo "Private or public org both keys does not exists."
+fi
+
+if [ $_CERTS -ne 1 ]; then
+        echo "Public or private key does not exist, SSL Apache configuration will be skipped. It doesn't make sense to continue executing this script."
+        exit 0
+else
+        echo "SSL keys founded, SSL Apache configuration will be processed."
+fi
+
+echo "All question you be asked for are needed for multi service installation."
+echo "If you want deploy single service only leave them empty."
+
+read -p 'FQDN : ' _FQDN
+read -p 'Base Service Port [5004]: ' -i "5004" _PORT
+read -p 'Suffix : ' _SUFFIX
+
+echo "----------------------------- Summary -----------------------------"
+echo "FQDN   : $_FQDN"
+echo "PORT   : $_PORT"
+echo "SUFFIX : $_SUFFIX"
+if [ $_CERTS -ne 1 ]; then
+        echo "SSL    : No"
+else
+        echo "SSL    : Yes"
+fi
+
+read -rsn1 -p "Press any key to continue or Ctrl+C for exit."
+echo
+
+#### konfiguracja ssl apache2 jeżeli sa klucze
+if [ $_CERTS -eq 1 ]; then
+
+cp -i ./$_PUBFILE /etc/ssl/certs/
+cp -i ./$_KEYFILE /etc/ssl/private/
+cp -i ./$_P1CA /etc/ssl/certs/
+cp -i ./$_P1DN /etc/ssl/certs/
+
+cat << EOF > /etc/apache2/sites-available/RepozytoriumP1-ssl$_SUFFIX.conf
+<IfModule mod_ssl.c>
+        <VirtualHost *:443>
+                                #ServerName www.example.com
+                ServerAdmin it@example.com
+
+                DocumentRoot /var/www/RepozytoriumP1$_SUFFIX
+
+        ProxyPreserveHost On
+        ProxyPass /RepozytoriumP1 http://localhost:$_PORT/
+        ProxyPassReverse /RepozytoriumP1 http://localhost:$_PORT/
+
+                # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
+                # error, crit, alert, emerg.
+                # It is also possible to configure the loglevel for particular
+                # modules, e.g.
+                #LogLevel info ssl:warn
+
+                ErrorLog \${APACHE_LOG_DIR}/error.log
+                CustomLog \${APACHE_LOG_DIR}/access.log combined
+
+                # For most configuration files from conf-available/, which are
+                # enabled or disabled at a global level, it is possible to
+                # include a line for only one particular virtual host. For example the
+                # following line enables the CGI configuration for this host only
+                # after it has been globally disabled with "a2disconf".
+                #Include conf-available/serve-cgi-bin.conf
+
+                #   SSL Engine Switch:
+                #   Enable/Disable SSL for this virtual host.
+                SSLEngine on
+
+                Header edit Set-Cookie ^(.*)$ $1;Secure
+                SSLProtocol +TLSv1.2
+
+                #   A self-signed (snakeoil) certificate can be created by installing
+                #   the ssl-cert package. See
+                #   /usr/share/doc/apache2/README.Debian.gz for more info.
+                #   If both key and certificate are stored in the same file, only the
+                #   SSLCertificateFile directive is needed.
+                SSLCertificateFile      /etc/ssl/certs/$_PUBFILE
+                SSLCertificateKeyFile /etc/ssl/private/$_KEYFILE
+
+                #   Server Certificate Chain:
+                #   Point SSLCertificateChainFile at a file containing the
+                #   concatenation of PEM encoded CA certificates which form the
+                #   certificate chain for the server certificate. Alternatively
+                #   the referenced file can be the same as SSLCertificateFile
+                #   when the CA certificates are directly appended to the server
+                #   certificate for convinience.
+                #SSLCertificateChainFile /etc/apache2/ssl.crt/server-ca.crt
+
+                #   Certificate Authority (CA):
+                #   Set the CA certificate verification path where to find CA
+                #   certificates for client authentication or alternatively one
+                #   huge file containing all of them (file must be PEM encoded)
+                #   Note: Inside SSLCACertificatePath you need hash symlinks
+                #                to point to the certificate files. Use the provided
+                #                Makefile to update the hash symlinks after changes.
+                #SSLCACertificatePath /etc/ssl/certs/
+                SSLCACertificateFile /etc/ssl/certs/CCP1RootCA.crt
+                SSLCADNRequestFile /etc/ssl/certs/CCP1SubCATLS.crt
+
+                #   Certificate Revocation Lists (CRL):
+                #   Set the CA revocation path where to find CA CRLs for client
+                #   authentication or alternatively one huge file containing all
+                #   of them (file must be PEM encoded)
+                #   Note: Inside SSLCARevocationPath you need hash symlinks
+                #                to point to the certificate files. Use the provided
+                #                Makefile to update the hash symlinks after changes.
+                #SSLCARevocationPath /etc/apache2/ssl.crl/
+                #SSLCARevocationFile /etc/apache2/ssl.crl/ca-bundle.crl
+
+                #   Client Authentication (Type):
+                #   Client certificate verification type and depth.  Types are
+                #   none, optional, require and optional_no_ca.  Depth is a
+                #   number which specifies how deeply to verify the certificate
+                #   issuer chain before deciding the certificate is not valid.
+                #SSLVerifyClient require
+                #SSLVerifyDepth  10
+
+                #   SSL Engine Options:
+                #   Set various options for the SSL engine.
+                #   o FakeBasicAuth:
+                #        Translate the client X.509 into a Basic Authorisation.  This means that
+                #        the standard Auth/DBMAuth methods can be used for access control.  The
+                #        user name is the \`one line' version of the client's X.509 certificate.
+                #        Note that no password is obtained from the user. Every entry in the user
+                #        file needs this password: \`xxj31ZMTZzkVA'.
+                #   o ExportCertData:
+                #        This exports two additional environment variables: SSL_CLIENT_CERT and
+                #        SSL_SERVER_CERT. These contain the PEM-encoded certificates of the
+                #        server (always existing) and the client (only existing when client
+                #        authentication is used). This can be used to import the certificates
+                #        into CGI scripts.
+                #   o StdEnvVars:
+                #        This exports the standard SSL/TLS related \`SSL_*' environment variables.
+                #        Per default this exportation is switched off for performance reasons,
+                #        because the extraction step is an expensive operation and is usually
+                #        useless for serving static content. So one usually enables the
+                #        exportation for CGI and SSI requests only.
+                #   o OptRenegotiate:
+                #        This enables optimized SSL connection renegotiation handling when SSL
+                #        directives are used in per-directory context.
+                #SSLOptions +FakeBasicAuth +ExportCertData +StrictRequire
+                <FilesMatch "\.(cgi|shtml|phtml|php)$">
+                                SSLOptions +StdEnvVars
+                </FilesMatch>
+                <Directory /usr/lib/cgi-bin>
+                                SSLOptions +StdEnvVars
+                </Directory>
+
+                #   SSL Protocol Adjustments:
+                #   The safe and default but still SSL/TLS standard compliant shutdown
+                #   approach is that mod_ssl sends the close notify alert but doesn't wait for
+                #   the close notify alert from client. When you need a different shutdown
+                #   approach you can use one of the following variables:
+                #   o ssl-unclean-shutdown:
+                #        This forces an unclean shutdown when the connection is closed, i.e. no
+                #        SSL close notify alert is send or allowed to received.  This violates
+                #        the SSL/TLS standard but is needed for some brain-dead browsers. Use
+                #        this when you receive I/O errors because of the standard approach where
+                #        mod_ssl sends the close notify alert.
+                #   o ssl-accurate-shutdown:
+                #        This forces an accurate shutdown when the connection is closed, i.e. a
+                #        SSL close notify alert is send and mod_ssl waits for the close notify
+                #        alert of the client. This is 100% SSL/TLS standard compliant, but in
+                #        practice often causes hanging connections with brain-dead browsers. Use
+                #        this only for browsers where you know that their SSL implementation
+                #        works correctly.
+                #   Notice: Most problems of broken clients are also related to the HTTP
+                #   keep-alive facility, so you usually additionally want to disable
+                #   keep-alive for those clients, too. Use variable "nokeepalive" for this.
+                #   Similarly, one has to force some clients to use HTTP/1.0 to workaround
+                #   their broken HTTP/1.1 implementation. Use variables "downgrade-1.0" and
+                #   "force-response-1.0" for this.
+                # BrowserMatch "MSIE [2-6]" \
+                #               nokeepalive ssl-unclean-shutdown \
+                #               downgrade-1.0 force-response-1.0
+
+                RequestHeader set X-Forwarded-Proto https
+
+                SSLOptions +ExportCertData
+                SSLVerifyClient optional
+                SSLVerifyDepth 3
+                RequestHeader set SSL_CLIENT_CERT "%{SSL_CLIENT_CERT}e"
+
+        </VirtualHost>
+</IfModule>
+
+# vim: syntax=apache ts=4 sw=4 sts=4 sr noet
+EOF
+
+if [ ${#_FQDN} -gt 0 ];then
+        sed -i 's/#ServerName\ www.example.com/ServerName\ '$_FQDN'/' /etc/apache2/sites-available/RepozytoriumP1-ssl$_SUFFIX.conf
+fi
+if [ ${#_SUFFIX} -gt 0 ];then
+        sed -i 's/\/RepozytoriumP1/\/RepozytoriumP1'$_SUFFIX'/' /etc/apache2/sites-available/RepozytoriumP1-ssl$_SUFFIX.conf
+fi
+
+a2ensite RepozytoriumP1-ssl$_SUFFIX
+
+fi
+
+systemctl restart apache2
+
+
+#### instalacja app
+
+#ZIPFILE=~/mMods_AR_pkg.zip
+if [ -f "$_ZIPFILE" ]; then
+        unzip $_ZIPFILE
+else
+    echo "$_ZIPFILE does not exists."
+        exit 0
+fi
+
+mv -f ./RepozytoriumP1 /var/www/RepozytoriumP1$_SUFFIX
+
+
+sed -i 's/'\"ApplicationName\":\ \"\"'/'\"ApplicationName\":\ \"RepozytoriumP1$_SUFFIX\"'/' /var/www/RepozytoriumP1$_SUFFIX/appsettings.json
+sed -i 's/Database=ARCHMMEDICA/Database=ARCHMMEDICA'$_SUFFIX'/' /var/www/RepozytoriumP1$_SUFFIX/appsettings.json
+
+
+if [ $(($_PORT)) -ne 5004 ] && [ ${#_PORT} -eq 4 ];then
+
+        sed -i 's/localhost:5004/localhost:'$_PORT'/' /var/www/RepozytoriumP1$_SUFFIX/appsettings.json
+
+fi
+
+
+chmod +w /var/www/RepozytoriumP1$_SUFFIX/application.log
+
+
+#### utworzenie serwisu
+
+cat << EOF > /lib/systemd/system/mMedica.RepoP1$_SUFFIX.service
+[Unit]
+Description = mMedica Repozytorium P1
+
+
+[Service]
+ExecStart=/usr/bin/dotnet /var/www/RepozytoriumP1/Repozytoriump1.dll
+WorkingDirectory=/var/www/RepozytoriumP1
+Restart=always
+RestartSec=10
+SyslogIdentifier=mMedica-RepoP1$_SUFFIX
+User=root
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+sed -i 's/RepozytoriumP1/RepozytoriumP1'$_SUFFIX'/' /lib/systemd/system/mMedica.RepoP1$_SUFFIX.service
+
+systemctl daemon-reload
+
+
+#### start app
+
+systemctl enable mMedica.RepoP1$_SUFFIX.service
+
+
