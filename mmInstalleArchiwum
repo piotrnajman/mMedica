@@ -12,8 +12,8 @@ cd ~/
 #### sprawdznie czy są dostępne wymagane repozytoria, podsumowanie przed startem skryptu
 
 _ZIPFILE=~/mMods_AR_pkg.zip
-_PUBFILE=~/6BE2C3585DBC60D372043A560D129B3C.crt
-_KEYFILE=~/6BE2C3585DBC60D372043A560D129B3C.key
+_PUBFILE=6BE2C3585DBC60D372043A560D129B3C.crt
+_KEYFILE=6BE2C3585DBC60D372043A560D129B3C.key
 _CERTS=0
 
 if [ ! -f $_ZIPFILE ]; then
@@ -229,16 +229,13 @@ cat << EOF > /etc/apache2/sites-available/eArchiwum-ssl.conf
                 #   Similarly, one has to force some clients to use HTTP/1.0 to workaround
                 #   their broken HTTP/1.1 implementation. Use variables "downgrade-1.0" and
                 #   "force-response-1.0" for this.
-                # BrowserMatch "MSIE [2-6]" \
-                #               nokeepalive ssl-unclean-shutdown \
-                #               downgrade-1.0 force-response-1.0
+                # BrowserMatch "MSIE [2-6]" nokeepalive ssl-unclean-shutdown downgrade-1.0 force-response-1.0
 
         </VirtualHost>
 </IfModule>
 
 # vim: syntax=apache ts=4 sw=4 sts=4 sr noet
 EOF
-
 
 a2ensite eArchiwum-ssl
 
