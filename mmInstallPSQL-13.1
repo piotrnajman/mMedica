@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+#
+# Instalacja ze zrodel servera PostgreSQL 13.1
+# Autor Piotr Najman (c) 2021 MIT License
+# pnajman@vespe.pl
+#
+
+set -e
+cd ~/
+
+#### instalacja pakietów
+apt-get -y install vim-scripts make build-essential
+apt-get -y install libreadline-dev libzzip-dev zlib1g-dev
+apt-get -y install bison flex
+apt-get -y install zip unzip
+
+#### kompilacja postgresa ze zrodla
+wget -c https://ftp.postgresql.org/pub/source/v13.1/postgresql-13.1.tar.bz2
+bunzip2 postgresql-13.1.tar.bz2
+tar xf ./postgresql-13.1.tar
+rm ./postgresql-13.1.tar
+cd ~/postgresql-13.1
+#./configure
+./configure --prefix=/usr/local/pgsql13/
+make
+make world
+#make check (uruchamiamy jako user)
+make install
+make install-docs
+make install-world
+
+echo "Dodawanie użytkownika postgres"
+#adduser postgres
+useradd postgres
+
+mkdir /usr/local/pgsql13/data
+mkdir /usr/local/pgsql13/log
+chown postgres:postgres /usr/local/pgsql13/data
+chown postgres:postgres /usr/local/pgsql13/log
+
+
+#### podmiana plików
+cd ~/
+wget -c https://mmedica-download.asseco.pl/inst/Migrator_PG13/PG-linux13.1.tar
+tar xf ./PG-linux13.1.tar
+rm ./PG-linux13.1.tar
+cd ~/PG-linux13.1
+
+cp ./bin/* /usr/local/pgsql13/bin/
+cp ./lib/* /usr/local/pgsql13/lib/
+
+cd ~/
+rm -rf ./PG-linux13.1
+
+su - postgres -c "/usr/local/pgsql13/bin/initdb -D /usr/local/pgsql13/data/"
+su - postgres -c "/usr/local/pgsql13/bin/pg_ctl start -D /usr/local/pgsql13/data/ -l /usr/local/pgsql13/log/postgresql.log"
+
+
+#### modyfikacje dla polaczen zdalnych i restart uslugi - UWAGA ustawić podsieć w zmianie pg_hba jaka potrzebna i adres ip hosta w poleceniu sed !!!!
+echo "host	all		all 	192.168.0.0/16		md5" >> /usr/local/pgsql13/data/pg_hba.conf
+
+sed -i 's/'#listen_addresses\ =\ \'localhost\''/'listen_addresses\ =\ \'localhost,192.168.1.18\''/' /usr/local/pgsql13/data/postgresql.conf
+sed -i 's/'#search_path\ =\ \'\"\$user\",\ public\''/'search_path\ =\ \'public,restricted\''/' /usr/local/pgsql13/data/postgresql.conf
+
+su - postgres -c "/usr/local/pgsql13//bin/pg_ctl restart -D /usr/local/pgsql13//data/ -l /usr/local/pgsql13/log/postgresql.log"
+
+su - postgres -c "/usr/local/pgsql13/bin/pg_ctl stop -D /usr/local/pgsql13/data/ -l /usr/local/pgsql13/log/postgresql.log"
+
+#### utworzenie serwisu
+cat << EOF > /lib/systemd/system/postgresql.service
+[Unit]
+Description=Postgresql-13.1 Service
+After=syslog.target systemd-user-sessions.service
+
+[Service]
+User=postgres
+Group=postgres
+Type=forking
+TimeoutSec=120
+ExecStart=/usr/local/pgsql13/bin/pg_ctl start -D /usr/local/pgsql13/data -l /usr/local/pgsql13/log/postgresql.log
+ExecStop=/usr/local/pgsql13/bin/pg_ctl stop -D /usr/local/pgsql13/data -l /usr/local/pgsql13/log/postgresql.log
+ExecReload=/usr/local/pgsql13/bin/pg_ctl reload -D /usr/local/pgsql13/data -l /usr/local/pgsql13/log/postgresql.log
+Restart=/usr/local/pgsql13/bin/pg_ctl restart -D /usr/local/pgsql13/data -l /usr/local/pgsql13/log/postgresql.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+
+
+#### start postgresa jako serwisu
+
+systemctl enable postgresql.service
+
+systemctl start postgresql.service
+
+#### sprzatanie po instalacji
+
